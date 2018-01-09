@@ -6,7 +6,7 @@ import time
 import numpy as np
 from optparse import OptionParser
 import pickle
-
+import tensorflow as tf
 from keras import backend as K
 from keras.optimizers import Adam, SGD, RMSprop
 from keras.layers import Input
@@ -15,7 +15,7 @@ from keras_frcnn import config, data_generators
 from keras_frcnn import losses as losses
 import keras_frcnn.roi_helpers as roi_helpers
 from keras.utils import generic_utils
-
+import vis_bbox
 sys.setrecursionlimit(40000)
 
 parser = OptionParser()
@@ -143,6 +143,12 @@ except:
 
 optimizer = Adam(lr=1e-5)
 #optimizer_classifier = Adam(lr=1e-5)
+
+
+writer = tf.summary.FileWriter('logs/')
+
+
+
 model_rpn.compile(optimizer=optimizer, loss=[losses.rpn_loss_cls(num_anchors), losses.rpn_loss_regr(num_anchors)])
 #model_classifier.compile(optimizer=optimizer_classifier, loss=[losses.class_loss_cls, losses.class_loss_regr(len(classes_count)-1)], metrics={'dense_class_{}'.format(len(classes_count)): 'accuracy'})
 #model_all.compile(optimizer='sgd', loss='mae')
@@ -182,12 +188,17 @@ for epoch_num in range(num_epochs):
 
             loss_rpn = model_rpn.train_on_batch(X, Y)
 
+
             P_rpn = model_rpn.predict_on_batch(X)
 
             R = roi_helpers.rpn_to_roi(P_rpn[0], P_rpn[1], C, K.image_dim_ordering(), use_regr=True, overlap_thresh=0.7, max_boxes=300)
             # note: calc_iou converts from (x1,y1,x2,y2) to (x,y,w,h) format
             X2, Y1, Y2, IouS = roi_helpers.calc_iou(R, img_data, C, class_mapping)
 
+############draw the bbox from the rpn results
+            vis_bbox.plot_bbox(img_data, C, X2)
+
+############
             if X2 is None:
                 rpn_accuracy_rpn_monitor.append(0)
                 rpn_accuracy_for_epoch.append(0)
@@ -237,6 +248,10 @@ for epoch_num in range(num_epochs):
             #losses[iter_num, 2] = loss_class[1]
             #losses[iter_num, 3] = loss_class[2]
             #losses[iter_num, 4] = loss_class[3]
+
+            #summary = tf.Summary(value=[tf.Summary.scalar(tag="loss_class", simple_value=losses[iter_num,0]),])
+            #                            tf.Summary.Value(tag="loss_regr", simple_value=losses[iter_num,1])])
+            #writer.add_summary(summary)
 
             iter_num += 1
 
