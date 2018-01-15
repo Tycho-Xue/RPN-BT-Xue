@@ -38,8 +38,8 @@ parser.add_option("--input_weight_path", dest="input_weight_path", help="Input p
 
 (options, args) = parser.parse_args()
 
-if not options.train_path:   # if filename is not given
-    parser.error('Error: path to training data must be specified. Pass --path to command line')
+#if not options.train_path:   # if filename is not given
+#    parser.error('Error: path to training data must be specified. Pass --path to command line')
 
 if options.parser == 'pascal_voc':
     from keras_frcnn.pascal_voc_parser import get_data
