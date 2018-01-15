@@ -243,7 +243,7 @@ def rpn_to_roi(rpn_layer, regr_layer, C, dim_ordering, use_regr=True, max_boxes=
 
     for anchor_size in anchor_sizes:
         for anchor_ratio in anchor_ratios:
-
+            #anchor_x and anchor_y means that anchor's range
             anchor_x = (anchor_size * anchor_ratio[0])/C.rpn_stride
             anchor_y = (anchor_size * anchor_ratio[1])/C.rpn_stride
             if dim_ordering == 'th':
@@ -253,7 +253,7 @@ def rpn_to_roi(rpn_layer, regr_layer, C, dim_ordering, use_regr=True, max_boxes=
                 regr = np.transpose(regr, (2, 0, 1))
 
             X, Y = np.meshgrid(np.arange(cols),np. arange(rows))
-
+            # in this way, the A means the anchor coordinates of the anchor
             A[0, :, :, curr_layer] = X - anchor_x/2
             A[1, :, :, curr_layer] = Y - anchor_y/2
             A[2, :, :, curr_layer] = anchor_x

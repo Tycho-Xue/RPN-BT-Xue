@@ -6,7 +6,7 @@ import time
 import numpy as np
 from optparse import OptionParser
 import pickle
-import tensorflow as tf
+
 from keras import backend as K
 from keras.optimizers import Adam, SGD, RMSprop
 from keras.layers import Input
@@ -15,7 +15,7 @@ from keras_frcnn import config, data_generators
 from keras_frcnn import losses as losses
 import keras_frcnn.roi_helpers as roi_helpers
 from keras.utils import generic_utils
-import vis_bbox
+
 sys.setrecursionlimit(40000)
 
 parser = OptionParser()
@@ -75,11 +75,9 @@ if options.input_weight_path:
 else:
     # set the path to weights based on backend and model
     C.base_net_weights = nn.get_weight_path()
-####################################################################
-#####################training data interface########################
+
 all_imgs, classes_count, class_mapping = get_data(options.train_path)
-####################################################################
-####################################################################
+
 if 'bg' not in classes_count:
     classes_count['bg'] = 0
     class_mapping['bg'] = len(class_mapping)
@@ -144,16 +142,10 @@ except:
         https://github.com/fchollet/keras/tree/master/keras/applications')
 
 optimizer = Adam(lr=1e-5)
-#optimizer_classifier = Adam(lr=1e-5)
-
-
-writer = tf.summary.FileWriter('logs/')
-
-
-
+optimizer_classifier = Adam(lr=1e-5)
 model_rpn.compile(optimizer=optimizer, loss=[losses.rpn_loss_cls(num_anchors), losses.rpn_loss_regr(num_anchors)])
-#model_classifier.compile(optimizer=optimizer_classifier, loss=[losses.class_loss_cls, losses.class_loss_regr(len(classes_count)-1)], metrics={'dense_class_{}'.format(len(classes_count)): 'accuracy'})
-#model_all.compile(optimizer='sgd', loss='mae')
+model_classifier.compile(optimizer=optimizer_classifier, loss=[losses.class_loss_cls, losses.class_loss_regr(len(classes_count)-1)], metrics={'dense_class_{}'.format(len(classes_count)): 'accuracy'})
+model_all.compile(optimizer='sgd', loss='mae')
 
 epoch_length = 1000
 num_epochs = int(options.num_epochs)
@@ -190,18 +182,12 @@ for epoch_num in range(num_epochs):
 
             loss_rpn = model_rpn.train_on_batch(X, Y)
 
-
             P_rpn = model_rpn.predict_on_batch(X)
 
             R = roi_helpers.rpn_to_roi(P_rpn[0], P_rpn[1], C, K.image_dim_ordering(), use_regr=True, overlap_thresh=0.7, max_boxes=300)
             # note: calc_iou converts from (x1,y1,x2,y2) to (x,y,w,h) format
             X2, Y1, Y2, IouS = roi_helpers.calc_iou(R, img_data, C, class_mapping)
 
-############draw the bbox from the rpn results
-            if epoch_num>=3:
-                vis_bbox.plot_bbox(img_data, C, X2)
-
-############
             if X2 is None:
                 rpn_accuracy_rpn_monitor.append(0)
                 rpn_accuracy_for_epoch.append(0)
@@ -209,7 +195,7 @@ for epoch_num in range(num_epochs):
 
             neg_samples = np.where(Y1[0, :, -1] == 1)
             pos_samples = np.where(Y1[0, :, -1] == 0)
-############randomly choose the data batch
+
             if len(neg_samples) > 0:
                 neg_samples = neg_samples[0]
             else:
@@ -243,23 +229,19 @@ for epoch_num in range(num_epochs):
                 else:
                     sel_samples = random.choice(pos_samples)
 
-            #loss_class = model_classifier.train_on_batch([X, X2[:, sel_samples, :]], [Y1[:, sel_samples, :], Y2[:, sel_samples, :]])
+            loss_class = model_classifier.train_on_batch([X, X2[:, sel_samples, :]], [Y1[:, sel_samples, :], Y2[:, sel_samples, :]])
 
             losses[iter_num, 0] = loss_rpn[1]
             losses[iter_num, 1] = loss_rpn[2]
 
-            #losses[iter_num, 2] = loss_class[1]
-            #losses[iter_num, 3] = loss_class[2]
-            #losses[iter_num, 4] = loss_class[3]
-
-            #summary = tf.Summary(value=[tf.Summary.scalar(tag="loss_class", simple_value=losses[iter_num,0]),])
-            #                            tf.Summary.Value(tag="loss_regr", simple_value=losses[iter_num,1])])
-            #writer.add_summary(summary)
+            losses[iter_num, 2] = loss_class[1]
+            losses[iter_num, 3] = loss_class[2]
+            losses[iter_num, 4] = loss_class[3]
 
             iter_num += 1
 
             progbar.update(iter_num, [('rpn_cls', np.mean(losses[:iter_num, 0])), ('rpn_regr', np.mean(losses[:iter_num, 1])),
-                                      ])
+                                      ('detector_cls', np.mean(losses[:iter_num, 2])), ('detector_regr', np.mean(losses[:iter_num, 3]))])
 
             if iter_num == epoch_length:
                 loss_rpn_cls = np.mean(losses[:, 0])
@@ -280,7 +262,7 @@ for epoch_num in range(num_epochs):
                     print('Loss Detector regression: {}'.format(loss_class_regr))
                     print('Elapsed time: {}'.format(time.time() - start_time))
 
-                curr_loss = loss_rpn_cls + loss_rpn_regr
+                curr_loss = loss_rpn_cls + loss_rpn_regr + loss_class_cls + loss_class_regr
                 iter_num = 0
                 start_time = time.time()
 

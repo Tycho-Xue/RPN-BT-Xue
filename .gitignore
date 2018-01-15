@@ -2,10 +2,12 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.swp
+*.tar
 # C extensions
 *.so
-
+VOCdevkit/
+bbox_plot/
 # Distribution / packaging
 .Python
 env/
