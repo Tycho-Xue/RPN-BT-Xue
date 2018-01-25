@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.swp
 *.tar
+history/
 # C extensions
 *.so
 VOCdevkit/
